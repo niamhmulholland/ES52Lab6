@@ -71,7 +71,7 @@ void setup()
   
   digitalWrite(pwrPin, LOW);
 
-  attachInterrupt(digitalPinToInterrupt(pushButton), checkStart, RISING);
+  attachInterrupt(digitalPinToInterrupt(pushButton), isBtnPrsd, CHANGE);
 
   
    /* Set up serial port if debugging enabled */
@@ -150,6 +150,13 @@ boolean isDispEnd()
   }
 }
 
+// set ISR flag
+
+void isBtnPrsd()
+{
+  start = !start;
+}
+
 /*********************************************************
  * boolean checkStart()
  * 
@@ -165,8 +172,7 @@ boolean isDispEnd()
  *********************************************************/
 
 boolean checkStart()
-{
-  start = 1;
+{ 
   return start;
   start = 0;
 }
