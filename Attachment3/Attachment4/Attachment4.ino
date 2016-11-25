@@ -26,9 +26,9 @@ const boolean debug = true;       // If TRUE debugging information sent to the s
 
 // Define time delay constants - they can be adjusted to get the best display
 
-const int FSM_FREQ = 2;             // frequency (in Hz) of the FSM
-const int ROLL_DELAY = <?>;           // roll time (in Sec) after button released
-const int DISP_DELAY = <?>;           // time to display final value (in Sec) before blanking display
+const int FSM_FREQ = 20;             // frequency (in Hz) of the FSM
+const int ROLL_DELAY = 50000;           // roll time (in Sec) after button released
+const int DISP_DELAY = 4000;           // time to display final value (in Sec) before blanking display
 
 // Define I/O Pin Constants here
 
@@ -38,7 +38,10 @@ const int clockPin = 5;
 const int latchPin = 6;
 const int pwrPin = 7;
 
-int LEDnum = 0;
+long LEDnum = 0;
+long prevNum = 0;
+int rollCount = 0;
+int dispCount = 0;
   
 // Declare global variables here
 
@@ -60,7 +63,7 @@ void setup()
   pinMode(clockPin, OUTPUT);
   pinMode(dataPin, OUTPUT);
   pinMode(pwrPin, OUTPUT);
-  pinMode(pushButton, INPUT);
+  pinMode(pushButton, INPUT_PULLUP);
   
   digitalWrite(pwrPin, LOW);
 
@@ -115,6 +118,32 @@ void turnLEDOn(int LED_Num)
 
 }
 
+boolean isRollEnd(void)
+{
+  rollCount++;
+  if(rollCount >= ROLL_DELAY)
+  {
+    return true;
+  }
+  else
+  {
+    return false;
+  }
+}
+
+boolean isDispEnd()
+{
+  dispCount++;
+  if(dispCount >= DISP_DELAY)
+  {
+    return true;
+  }
+  else 
+  {
+    return false;
+  }
+}
+
 /*********************************************************
  * boolean checkStart()
  * 
@@ -141,6 +170,7 @@ boolean checkStart()
   }
 
 }
+
 
  
 /*********************************************************
@@ -177,12 +207,16 @@ boolean checkStart()
 
 void sleep()
 {
+  /*digitalWrite(pwrPin, LOW);
+  digitalWrite(LED_BUILTIN, LOW);
+  checkStart(); */
 
 }
 
 void wake()
 {
-
+  /*digitalWrite(pwrPin, HIGH);
+  digitalWrite(LED_BUILTIN, HIGH);*/
 }
 
 
@@ -206,32 +240,82 @@ void loop()
   {
     Serial.print("State: ");
     Serial.println(curState);
+    Serial.print(checkStart());
   }
 
   switch (curState)
   {
     case 1:                             // Waiting for pushbutton 
+    if(checkStart())
+    {
+      curState = 2;
+    }
+    else 
+    {
+      curState = 1;
+    }
 
        break;
 
-    case 2:                          
+    case 2:
+      wake();
+      
+      prevNum = LEDnum;      //set previous LEDNum so we can check for repeated num
+      LEDnum = random(1,13);
+
+      if(LEDnum == prevNum)
+      {
+        curState = 2;
+      }
+      else 
+      {
+        turnLEDOn(LEDnum); 
+        curState = 3;                         
+      }
 
          break;
 
-    case 3:                         
+    case 3: 
+
+      if(!isRollEnd())   //if the button hasn't been pushed and the roll delay is not finished then stay in state 2
+      { 
+        curState = 2;
+      }
+      else if(checkStart())                                //if the button is pushed again go to state 4
+      {
+        rollCount = 0;
+        curState = 4; 
+      }
  
        break;  
 
-    case 4:                            
+    case 4:
+      if(checkStart())    // if the putton is pushed, return to state 2     
+      {
+        curState = 2;                           
+      }
+      else                // start display time out
+      { 
+        while(!isDispEnd())
+        {
+          turnLEDOn(LEDnum);
+        }
+        curState = 5;     
+        dispCount = 0;
+      }
  
        break;     
        
-    case 5:                               
+    case 5: 
+      turnLEDOn(0);
+      sleep();
+      curState = 1;  Serial.print("RESET");                            
  
        break; 
 
        default:
        {
+          curState = 1;
        }
 
   }
