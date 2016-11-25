@@ -4,8 +4,7 @@
   
   By: Niamh Mulholland & Cynthia Gu
   Date: 11/23/16
-  MRU:  11/23/16
-
+  MRU:  11/25/16
   This code implements a polled version of the uController 8 Ball.
   
   Pressing the button starts random LEDs to light one at a time.  
@@ -20,31 +19,24 @@
   In this skeleton program, values you need to select/add are indicated by "<?>"
 ********************************************************************************************************/
 // CONSTANT declarations
-
 // The following constant can be set TRUE to output debugging information to the serial port
 const boolean debug = true;       // If TRUE debugging information sent to the serial port
-
 // Define time delay constants - they can be adjusted to get the best display
-
 const int FSM_FREQ = 20;             // frequency (in Hz) of the FSM
-const int ROLL_DELAY = 50000;           // roll time (in Sec) after button released
-const int DISP_DELAY = 4000;           // time to display final value (in Sec) before blanking display
-
+const int ROLL_DELAY = 15;           // roll time (in Sec) after button released
+const int DISP_DELAY = 25;           // time to display final value (in Sec) before blanking display
 // Define I/O Pin Constants here
-
 const int pushButton = 1;
 const int dataPin = 4;
 const int clockPin = 5;
 const int latchPin = 6;
 const int pwrPin = 7;
-
 long LEDnum = 0;
 long prevNum = 0;
 int rollCount = 0;
 int dispCount = 0;
   
 // Declare global variables here
-
 int curState;              // FSM state variable
                            // 1: Idle - waiting for start command; all LEDs off
                
@@ -57,7 +49,6 @@ int curState;              // FSM state variable
  *********************************************************/
 void setup()
 {
-
   // Initialize I/O pins here
   pinMode(latchPin, OUTPUT);
   pinMode(clockPin, OUTPUT);
@@ -66,7 +57,6 @@ void setup()
   pinMode(pushButton, INPUT_PULLUP);
   
   digitalWrite(pwrPin, LOW);
-
   
    /* Set up serial port if debugging enabled */
  if (debug)
@@ -75,8 +65,6 @@ void setup()
    Serial.println("Initialization complete.");
  }
 }
-
-
 /*********************************************************
  * void turnLEDOn(int LED_Num)
  * 
@@ -89,11 +77,9 @@ void setup()
  * 
  * LED_Num = 0  turns all LEDs off
  *********************************************************/
-
-
 void turnLEDOn(int LED_Num)
 {
-   digitalWrite(latchPin, 0);
+  digitalWrite(latchPin, 0);
   
   int firstByte;
   int secondByte;
@@ -110,14 +96,10 @@ void turnLEDOn(int LED_Num)
     firstByte= 0;
     secondByte = pow(2,(LED_Num - 9)) + .5;
   }
-
   shiftOut(dataPin, clockPin, MSBFIRST, byte(firstByte));
   shiftOut(dataPin, clockPin, MSBFIRST, byte(secondByte));
-
   digitalWrite(latchPin, 1);
-
 }
-
 /*********************************************************
  * boolean checkStart()
  * 
@@ -131,7 +113,6 @@ void turnLEDOn(int LED_Num)
  * 
  * Returns TRUE if pushbutton pressed; FALSE otherwise
  *********************************************************/
-
 boolean checkStart()
 {
   if(!digitalRead(pushButton))
@@ -142,10 +123,7 @@ boolean checkStart()
   {
     return false;
   }
-
 }
-
-
  
 /*********************************************************
  * Functions to simulate sleep and wake modes
@@ -178,22 +156,17 @@ boolean checkStart()
  * do and 2) if you do not do it right it is difficult to
  * program the Arduino to fix it.  So we simulate it.
  *********************************************************/
-
 void sleep()
 {
   /*digitalWrite(pwrPin, LOW);
   digitalWrite(LED_BUILTIN, LOW);
   checkStart(); */
-
 }
-
 void wake()
 {
   /*digitalWrite(pwrPin, HIGH);
   digitalWrite(LED_BUILTIN, HIGH);*/
 }
-
-
 /*********************************************************
  * void loop())
  *  
@@ -206,7 +179,6 @@ void wake()
  *  
  * Runs forever
  *********************************************************/
-
 void loop()
 {
   
@@ -216,7 +188,6 @@ void loop()
     Serial.println(curState);
     Serial.print(checkStart());
   }
-
   switch (curState)
   {
     case 1:                             // Waiting for pushbutton 
@@ -228,9 +199,7 @@ void loop()
     {
       curState = 1;
     }
-
        break;
-
     case 2:
       wake();
       
@@ -241,71 +210,62 @@ void loop()
       {
         curState = 2;
       }
-      else 
+      else if (checkStart())
       {
         turnLEDOn(LEDnum); 
-        curState = 3;                         
+        curState = 2;                         
       }
-
-         break;
-
-    case 3:  
-      while(ROLL_DELAY > rollCount)
-      { Serial.print("inwhile");
-        curState = 2;  
-        rollCount++; 
+      else
+      {
+        turnLEDOn(LEDnum); 
+        curState = 3;  
       }
-      rollCount = 0;
-
+      break;
+    case 3: 
       if(checkStart())
       {
         curState = 2;
       }
+      else if(ROLL_DELAY > rollCount) 
+      { 
+        rollCount++;
+        curState = 2;
+      }
       else
       {
+        rollCount = 0;
         curState = 4; 
       }
  
        break;  
-
     case 4:
       if(checkStart())
       {
-        curState = 2;                           
+        curState = 2;
       }
-      else 
+      else if(DISP_DELAY > dispCount)
       { 
-        while(DISP_DELAY > dispCount)
-        { 
-          turnLEDOn(LEDnum);
-          dispCount++;
-        }
-        curState = 5;
-        dispCount = 0;
+        turnLEDOn(LEDnum);
+        dispCount++;
       }
+      else
+      {
+        dispCount = 0;
+        turnLEDOn(0);
+        sleep();
+        curState = 1;  Serial.print("RESET");   
+      }                         
  
-       break;     
-       
-    case 5: 
-      turnLEDOn(0);
-      sleep();
-      curState = 1;  Serial.print("RESET");                            
- 
-       break; 
-
-       default:
-       {
-          curState = 1;
-       }
-
+      break; 
+    default:
+    {
+        curState = 1;
+    }
   }
-
   // End of state case statement
   // Here do anything that always gets done once per FSM cycle
  
   
   delay(1000/FSM_FREQ);                 // wait for next state machine clock cycle
 }
-
-
 
