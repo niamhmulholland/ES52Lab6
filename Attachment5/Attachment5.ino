@@ -23,7 +23,7 @@
 const boolean debug = true;       // If TRUE debugging information sent to the serial port
 // Define time delay constants - they can be adjusted to get the best display
 const int FSM_FREQ = 20;             // frequency (in Hz) of the FSM
-const int ROLL_DELAY = 15;           // roll time (in Sec) after button released
+const int ROLL_DELAY = 20;           // roll time (in Sec) after button released
 const int DISP_DELAY = 25;           // time to display final value (in Sec) before blanking display
 // Define I/O Pin Constants here
 const int pushButton = 1;
@@ -35,6 +35,7 @@ long LEDnum = 0;
 long prevNum = 0;
 int rollCount = 0;
 int dispCount = 0;
+int slowDown = 0;
   
 // Declare global variables here
 int curState;              // FSM state variable
@@ -229,6 +230,7 @@ void loop()
       {
         turnLEDOn(LEDnum); 
         curState = 3;  
+        slowDown = slowDown + 8;
       }
       break;
     case 3: 
@@ -276,6 +278,6 @@ void loop()
   // Here do anything that always gets done once per FSM cycle
  
   
-  delay(1000/FSM_FREQ);                 // wait for next state machine clock cycle
+  delay(1000/FSM_FREQ + slowDown);                 // wait for next state machine clock cycle
 }
 
