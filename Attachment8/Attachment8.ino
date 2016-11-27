@@ -55,12 +55,44 @@ const int ON_TIME = 100;
 // ISR flag
 volatile boolean start = false;
 
+// CONSTANT declarations
+// The following constant can be set TRUE to output debugging information to the serial port
+const boolean debug = true;       // If TRUE debugging information sent to the serial port
+// Define time delay constants - they can be adjusted to get the best display
+const int FSM_FREQ = 20;             // frequency (in Hz) of the FSM
+const int ROLL_DELAY = 20;           // roll time (in Sec) after button released
+const int DISP_DELAY = 25;           // time to display final value (in Sec) before blanking display
+// Define I/O Pin Constants here
+const int pushButton = 1;
+const int dataPin = 4;
+const int clockPin = 5;
+const int latchPin = 6;
+const int pwrPin = 7;
+long LEDnum = 0;
+long prevNum = 0;
+int rollCount = 0;
+int dispCount = 0;
+int slowDown = 0;
+  
+// Declare global variables here
+int curState;              // FSM state variable
+                           // 1: Idle - waiting for start command; all LEDs off
+
 void setup()
 {
+  // Initialize I/O pins here
+  pinMode(latchPin, OUTPUT);
+  pinMode(clockPin, OUTPUT);
+  pinMode(dataPin, OUTPUT);
+  pinMode(pwrPin, OUTPUT);
+  pinMode(pushButton, INPUT_PULLUP);
+  
+  digitalWrite(pwrPin, LOW);
   pinMode(l1_interrupt, INPUT);
   pinMode(led_pin, OUTPUT);
 
   attachInterrupt(digitalPinToInterrupt(l1_interrupt), isInterrupt, FALLING);
+  
  /* Initialize the wire library */
  Wire.begin();
   
@@ -142,9 +174,46 @@ void setup()
  }
 }
 
+void turnLEDOn(int LED_Num)
+{
+  digitalWrite(latchPin, 0);
+  
+  int firstByte;
+  int secondByte;
+ 
+  if(LED_Num == 0){
+    firstByte = 0;
+    secondByte = 0;
+  }
+  else if (LED_Num < 9){
+    firstByte = pow(2,LED_Num - 1) + .5;
+    secondByte = 0;
+  }
+  else {
+    firstByte= 0;
+    secondByte = pow(2,(LED_Num - 9)) + .5;
+  }
+  shiftOut(dataPin, clockPin, MSBFIRST, byte(firstByte));
+  shiftOut(dataPin, clockPin, MSBFIRST, byte(secondByte));
+  digitalWrite(latchPin, 1);
+}
+
+void sleep()
+{
+  /*digitalWrite(pwrPin, LOW);
+  digitalWrite(LED_BUILTIN, LOW);
+  checkStart(); */
+}
+void wake()
+{
+  /*digitalWrite(pwrPin, HIGH);
+  digitalWrite(LED_BUILTIN, HIGH);*/
+}
+
+
 void isInterrupt(void) 
 {
-  start = true; 
+  start = true; Serial.print("hi");
 }
 
 boolean checkStart()
@@ -190,19 +259,93 @@ void writeRegister(byte reg, byte value)
 }
 
 void loop()
-{ 
-   if(checkStart())
-   {
-    if(ON_TIME > lightCount++)
+{
+  
+  if (debug)                            // if debug enabled, print state to serial monitor
+  {
+    Serial.print("State: ");
+    Serial.println(curState);
+    //Serial.print(checkStart());
+  }
+  switch (curState)
+  {
+    case 1:                             // Waiting for pushbutton 
+    if(checkStart())
     {
-      digitalWrite(led_pin, HIGH); //turn led on 
-      readRegister(0x16);  //clear the register 
-    }    
-   }
-   else
-   {
-    lightCount = 0;
-    digitalWrite(led_pin, LOW); //turn led off
-   }
-  delay(50);                   
+      curState = 2;
+    }
+    else 
+    {
+      curState = 1;
+    }
+       break;
+    case 2:
+      wake();
+      
+      prevNum = LEDnum;      //set previous LEDNum so we can check for repeated num
+      LEDnum = random(1,13);
+      
+      if(LEDnum == prevNum)
+      {
+        curState = 2;
+      }
+      else if (checkStart())
+      {
+        turnLEDOn(LEDnum); 
+        curState = 2;                         
+      }
+      else
+      {
+        turnLEDOn(LEDnum); 
+        curState = 3;  
+        slowDown = slowDown + 8;
+      }
+      break;
+    case 3: 
+      if(checkStart())
+      {
+        curState = 2;
+      }
+      else if(ROLL_DELAY > rollCount) 
+      { 
+        rollCount++;
+        curState = 2;
+      }
+      else
+      {
+        rollCount = 0;
+        curState = 4; 
+      }
+ 
+       break;  
+    case 4:
+      if(checkStart())
+      {
+        curState = 2;
+      }
+      else if(DISP_DELAY > dispCount)
+      { 
+        turnLEDOn(LEDnum);
+        dispCount++;
+      }
+      else
+      {
+        dispCount = 0;
+        turnLEDOn(0);
+        sleep();
+        curState = 1;  Serial.print("RESET");   
+      }                         
+ 
+      break; 
+    default:
+    {
+        curState = 1;
+    }
+  }
+  // End of state case statement
+  // Here do anything that always gets done once per FSM cycle
+ 
+  
+  delay(1000/FSM_FREQ + slowDown);                 // wait for next state machine clock cycle
 }
+
